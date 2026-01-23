@@ -36,3 +36,13 @@ class ArticleListResponse(BaseModel):
     limit: int
     offset: int
     has_more: bool
+
+
+class CategoryCount(BaseModel):
+    name: str
+    count: int
+
+
+class RegionCount(BaseModel):
+    name: str
+    count: int
