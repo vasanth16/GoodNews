@@ -1,4 +1,6 @@
+import re
 import feedparser
+import httpx
 from datetime import datetime
 from time import struct_time
 
@@ -30,6 +32,64 @@ def parse_published_date(date_parsed: struct_time | None) -> datetime | None:
         return None
 
 
+def extract_image_url(entry: dict) -> str | None:
+    """Extract image URL from RSS entry using various methods."""
+    # Try media:content
+    if hasattr(entry, "media_content") and entry.media_content:
+        for media in entry.media_content:
+            if media.get("medium") == "image" or media.get("type", "").startswith("image/"):
+                return media.get("url")
+        # If no explicit image type, take first media_content with url
+        if entry.media_content[0].get("url"):
+            return entry.media_content[0].get("url")
+
+    # Try media:thumbnail
+    if hasattr(entry, "media_thumbnail") and entry.media_thumbnail:
+        return entry.media_thumbnail[0].get("url")
+
+    # Try enclosures
+    if hasattr(entry, "enclosures") and entry.enclosures:
+        for enclosure in entry.enclosures:
+            if enclosure.get("type", "").startswith("image/"):
+                return enclosure.get("href") or enclosure.get("url")
+
+    # Try links with image type
+    if hasattr(entry, "links"):
+        for link in entry.links:
+            if link.get("type", "").startswith("image/"):
+                return link.get("href")
+
+    return None
+
+
+async def fetch_og_image(url: str) -> str | None:
+    """Fetch og:image meta tag from article URL."""
+    try:
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            response = await client.get(url, headers={
+                "User-Agent": "Mozilla/5.0 (compatible; BrightWorldNews/1.0)"
+            })
+            if response.status_code != 200:
+                return None
+
+            html = response.text[:50000]  # Only check first 50KB
+
+            # Look for og:image meta tag
+            patterns = [
+                r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
+                r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']',
+            ]
+
+            for pattern in patterns:
+                match = re.search(pattern, html, re.IGNORECASE)
+                if match:
+                    return match.group(1)
+
+            return None
+    except Exception:
+        return None
+
+
 def fetch_rss_feed(url: str) -> list[dict]:
     """Fetch and parse an RSS feed, returning a list of article dicts."""
     try:
@@ -43,6 +103,7 @@ def fetch_rss_feed(url: str) -> list[dict]:
                 "summary": entry.get("summary") or entry.get("description", ""),
                 "published": parse_published_date(entry.get("published_parsed")),
                 "guid": entry.get("id") or entry.get("link", ""),
+                "image_url": extract_image_url(entry),
             }
             articles.append(article)
 
@@ -90,13 +151,20 @@ async def store_articles(articles: list[dict], session: AsyncSession) -> int:
         hopefulness_score = calculate_hopefulness_score(headline, summary)
         category = detect_category(headline, summary)
 
+        # Get image URL - try RSS first, then fetch og:image from page
+        image_url = article_data.get("image_url")
+        if not image_url:
+            article_link = article_data.get("link", "")
+            if article_link:
+                image_url = await fetch_og_image(article_link)
+
         article = Article(
             guid=guid,
             headline=headline,
             summary=summary,
             source_url=article_data.get("link", ""),
             source_name=article_data.get("source_name", ""),
-            image_url=article_data.get("image_url"),
+            image_url=image_url,
             published_at=article_data.get("published"),
             hopefulness_score=hopefulness_score,
             category=category,
