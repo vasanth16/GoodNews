@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import init_db
+from app.routers import articles_router
 
 
 @asynccontextmanager
@@ -11,6 +12,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Bright World News API", lifespan=lifespan)
+app.include_router(articles_router, prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,

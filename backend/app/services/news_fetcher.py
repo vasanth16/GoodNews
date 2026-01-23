@@ -6,6 +6,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Article
+from app.services.content_filter import (
+    calculate_hopefulness_score,
+    detect_category,
+    should_include,
+)
 
 
 RSS_SOURCES = [
@@ -60,12 +65,19 @@ def fetch_all_sources() -> list[dict]:
 
 
 async def store_articles(articles: list[dict], session: AsyncSession) -> int:
-    """Store articles in the database, skipping duplicates by guid."""
+    """Store articles in the database, skipping duplicates and filtered content."""
     new_count = 0
 
     for article_data in articles:
         guid = article_data.get("guid")
         if not guid:
+            continue
+
+        headline = article_data.get("title", "")
+        summary = article_data.get("summary") or ""
+
+        # Skip articles with too many negative keywords
+        if not should_include(headline, summary):
             continue
 
         result = await session.execute(select(Article).where(Article.guid == guid))
@@ -74,14 +86,20 @@ async def store_articles(articles: list[dict], session: AsyncSession) -> int:
         if existing:
             continue
 
+        # Calculate hopefulness score and category
+        hopefulness_score = calculate_hopefulness_score(headline, summary)
+        category = detect_category(headline, summary)
+
         article = Article(
             guid=guid,
-            headline=article_data.get("title", ""),
-            summary=article_data.get("summary"),
+            headline=headline,
+            summary=summary,
             source_url=article_data.get("link", ""),
             source_name=article_data.get("source_name", ""),
             image_url=article_data.get("image_url"),
             published_at=article_data.get("published"),
+            hopefulness_score=hopefulness_score,
+            category=category,
         )
         session.add(article)
         new_count += 1
