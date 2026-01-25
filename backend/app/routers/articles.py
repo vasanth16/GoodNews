@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -82,6 +84,27 @@ async def get_regions(session: AsyncSession = Depends(get_session)):
     rows = result.all()
 
     return [RegionCount(name=row.region, count=row.count) for row in rows]
+
+
+@router.get("/stats")
+async def get_stats(session: AsyncSession = Depends(get_session)):
+    """Return article statistics including today's count."""
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # Count articles published today
+    today_count_result = await session.execute(
+        select(func.count(Article.id)).where(Article.published_at >= today_start)
+    )
+    today_count = today_count_result.scalar_one()
+
+    # Total count
+    total_result = await session.execute(select(func.count(Article.id)))
+    total_count = total_result.scalar_one()
+
+    return {
+        "today": today_count,
+        "total": total_count,
+    }
 
 
 @router.get("/{article_id}", response_model=ArticleResponse)

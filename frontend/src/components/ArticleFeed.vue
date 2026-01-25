@@ -29,8 +29,8 @@ function handleRetry() {
 <template>
   <div>
     <!-- Results count -->
-    <p v-if="!loading && articles.length > 0" class="text-sm text-gray-500 mb-4">
-      Showing {{ articles.length }} of {{ total }} articles
+    <p v-if="!loading && articles.length > 0" class="text-xs text-gray-400 mb-3">
+      {{ articles.length }} of {{ total }} articles
     </p>
 
     <!-- Error state -->
@@ -53,7 +53,7 @@ function handleRetry() {
       v-else-if="articles.length > 0"
       name="articles"
       tag="div"
-      class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+      class="grid grid-cols-1 lg:grid-cols-2 gap-3"
     >
       <ArticleCard
         v-for="article in articles"
@@ -72,22 +72,21 @@ function handleRetry() {
     </div>
 
     <!-- Load more -->
-    <div v-if="articles.length > 0" class="mt-8 text-center">
+    <div v-if="articles.length > 0" class="mt-6 text-center">
       <button
         v-if="hasMore && !loading"
         @click="loadMore"
-        class="px-6 py-3 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 transition-colors"
+        class="px-4 py-2 text-sm bg-gray-100 text-gray-600 font-medium rounded-md hover:bg-gray-200 transition-colors"
       >
-        Load More
+        Load more
       </button>
 
       <LoadingSpinner
         v-else-if="loading"
-        text="Loading more..."
       />
 
-      <p v-else class="text-gray-400 text-sm">
-        You've reached the end
+      <p v-else class="text-gray-300 text-xs">
+        End of articles
       </p>
     </div>
   </div>

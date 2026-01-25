@@ -71,3 +71,7 @@ export async function getRegions() {
 export async function triggerFetch() {
   return request('/api/articles/fetch', { method: 'POST' })
 }
+
+export async function getStats() {
+  return request('/api/articles/stats')
+}
