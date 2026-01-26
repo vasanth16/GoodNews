@@ -7,7 +7,6 @@ export default defineConfig({
     vue(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'icons/*.png', 'offline.html'],
       manifest: {
         name: 'Something to be hopeful about',
         short_name: 'Hopeful',
@@ -37,9 +36,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        navigateFallback: '/offline.html',
-        navigateFallbackDenylist: [/^\/api\//],
+        navigateFallbackDenylist: [/^\/api/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -85,7 +82,7 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: /^https:\/\/.*\.(png|jpg|jpeg|webp|gif|svg)$/i,
+            urlPattern: /\.(?:png|jpg|jpeg|webp|gif|svg)$/i,
             handler: 'CacheFirst',
             options: {
               cacheName: 'image-cache',
@@ -116,4 +113,17 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    target: 'esnext',
+    minify: 'esbuild',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-vue': ['vue'],
+          'vendor-icons': ['@heroicons/vue/20/solid'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 500,
+  },
 })

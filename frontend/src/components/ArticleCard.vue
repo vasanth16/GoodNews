@@ -1,6 +1,7 @@
 <script setup>
-import { computed } from 'vue'
-import { ArrowTopRightOnSquareIcon } from '@heroicons/vue/20/solid'
+import { ref, computed } from 'vue'
+import { ArrowTopRightOnSquareIcon, ShareIcon } from '@heroicons/vue/20/solid'
+import Toast from './Toast.vue'
 
 const props = defineProps({
   article: {
@@ -49,6 +50,41 @@ const fallbackImage = 'https://images.unsplash.com/photo-1504711434969-e33886168
 const cleanSummary = computed(() => {
   return props.article.summary?.replace(/<[^>]*>/g, '').substring(0, 150) || ''
 })
+
+// Share functionality
+const showToast = ref(false)
+const toastMessage = ref('')
+
+async function handleShare() {
+  const shareData = {
+    title: props.article.headline,
+    text: cleanSummary.value,
+    url: props.article.source_url,
+  }
+
+  if (navigator.share) {
+    try {
+      await navigator.share(shareData)
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        copyToClipboard()
+      }
+    }
+  } else {
+    copyToClipboard()
+  }
+}
+
+async function copyToClipboard() {
+  try {
+    await navigator.clipboard.writeText(props.article.source_url)
+    toastMessage.value = 'Link copied!'
+    showToast.value = true
+  } catch {
+    toastMessage.value = 'Failed to copy'
+    showToast.value = true
+  }
+}
 </script>
 
 <template>
@@ -99,16 +135,32 @@ const cleanSummary = computed(() => {
       <!-- Footer -->
       <div class="flex items-center justify-between mt-2">
         <span class="text-[10px] text-gray-400">{{ article.source_name }}</span>
-        <a
-          :href="article.source_url"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="text-gray-300 hover:text-primary-600 transition-colors"
-          title="Open article"
-        >
-          <ArrowTopRightOnSquareIcon class="w-3.5 h-3.5" />
-        </a>
+        <div class="flex items-center gap-2">
+          <button
+            @click="handleShare"
+            class="text-gray-300 hover:text-primary-600 transition-colors"
+            title="Share article"
+          >
+            <ShareIcon class="w-3.5 h-3.5" />
+          </button>
+          <a
+            :href="article.source_url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-gray-300 hover:text-primary-600 transition-colors"
+            title="Open article"
+          >
+            <ArrowTopRightOnSquareIcon class="w-3.5 h-3.5" />
+          </a>
+        </div>
       </div>
     </div>
+
+    <!-- Toast notification -->
+    <Toast
+      :message="toastMessage"
+      :visible="showToast"
+      @close="showToast = false"
+    />
   </article>
 </template>
