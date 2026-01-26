@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import AppHeader from './components/AppHeader.vue'
 import FilterBar from './components/FilterBar.vue'
 import ArticleFeed from './components/ArticleFeed.vue'
+import InstallPrompt from './components/InstallPrompt.vue'
 import { getCategories, getRegions } from './services/api.js'
 import { useArticles } from './composables/useArticles.js'
 
@@ -34,7 +35,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="min-h-screen bg-gray-50 pb-20">
     <AppHeader />
 
     <main class="container mx-auto px-4 py-4 max-w-5xl">
@@ -48,6 +49,8 @@ onMounted(() => {
 
       <ArticleFeed />
     </main>
+
+    <InstallPrompt />
   </div>
 </template>
 

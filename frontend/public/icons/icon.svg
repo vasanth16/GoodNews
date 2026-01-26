@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="blueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B82F6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1D4ED8;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="100" fill="url(#blueGradient)"/>
+
+  <!-- Sun -->
+  <circle cx="256" cy="200" r="60" fill="#FDB813"/>
+
+  <!-- Document/news icon -->
+  <rect x="160" y="290" width="192" height="160" rx="16" fill="#FFF"/>
+
+  <!-- Headline bar -->
+  <rect x="185" y="320" width="142" height="14" rx="7" fill="#1D4ED8"/>
+
+  <!-- Article text lines -->
+  <rect x="185" y="355" width="142" height="8" rx="4" fill="#94A3B8"/>
+  <rect x="185" y="375" width="110" height="8" rx="4" fill="#94A3B8"/>
+  <rect x="185" y="395" width="130" height="8" rx="4" fill="#94A3B8"/>
+  <rect x="185" y="415" width="95" height="8" rx="4" fill="#94A3B8"/>
+</svg>
