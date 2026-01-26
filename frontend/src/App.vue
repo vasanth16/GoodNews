@@ -4,6 +4,7 @@ import AppHeader from './components/AppHeader.vue'
 import FilterBar from './components/FilterBar.vue'
 import ArticleFeed from './components/ArticleFeed.vue'
 import InstallPrompt from './components/InstallPrompt.vue'
+import OfflineIndicator from './components/OfflineIndicator.vue'
 import { getCategories, getRegions } from './services/api.js'
 import { useArticles } from './composables/useArticles.js'
 
@@ -36,6 +37,7 @@ onMounted(() => {
 
 <template>
   <div class="min-h-screen bg-gray-50 pb-20">
+    <OfflineIndicator />
     <AppHeader />
 
     <main class="container mx-auto px-4 py-4 max-w-5xl">
