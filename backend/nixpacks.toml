@@ -1,8 +1,5 @@
-[phases.setup]
-nixPkgs = ["python311"]
-
-[phases.install]
-cmds = ["pip install -r requirements.txt"]
+# Let nixpacks auto-detect Python from requirements.txt
+# Only override the start command
 
 [start]
 cmd = "gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT"
