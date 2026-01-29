@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:5173"
     LOG_LEVEL: str = "INFO"
     GEMINI_API_KEY: str = ""
-    RATING_THRESHOLD: int = 65
+    RATING_THRESHOLD: int = 50
 
     # News API sources
     GUARDIAN_API_KEY: str = ""

@@ -166,6 +166,18 @@ async def get_stats(session: AsyncSession = Depends(get_session)):
     )
     today_count = today_result.scalar_one()
 
+    # Score distribution for rated articles
+    score_distribution = {}
+    for label, low, high in [("0-25", 0, 25), ("25-50", 25, 50), ("50-75", 50, 75), ("75-100", 75, 101)]:
+        bucket_result = await session.execute(
+            select(func.count(Article.id)).where(
+                Article.is_rated == True,
+                Article.hopefulness_score >= low,
+                Article.hopefulness_score < high,
+            )
+        )
+        score_distribution[label] = bucket_result.scalar_one()
+
     return {
         "articles": {
             "total": total_count,
@@ -175,6 +187,7 @@ async def get_stats(session: AsyncSession = Depends(get_session)):
             "above_threshold": above_threshold_count,
             "fetched_today": today_count,
         },
+        "score_distribution": score_distribution,
         "sources": sources,
         "api_usage": {
             "guardian": get_guardian_usage(),
