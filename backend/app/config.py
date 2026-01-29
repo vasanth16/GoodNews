@@ -10,6 +10,12 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     RATING_THRESHOLD: int = 65
 
+    # News API sources
+    GUARDIAN_API_KEY: str = ""
+    GUARDIAN_ENABLED: bool = True
+    THENEWSAPI_KEY: str = ""
+    THENEWSAPI_ENABLED: bool = True
+
     class Config:
         env_file = ".env"
 

@@ -9,6 +9,8 @@ from app.database import get_session
 from app.models import Article
 from app.schemas import ArticleResponse, ArticleListResponse, CategoryCount, RegionCount
 from app.services.news_fetcher import fetch_and_store
+from app.services.guardian_fetcher import get_guardian_usage
+from app.services.thenewsapi_fetcher import get_thenewsapi_usage
 
 router = APIRouter(prefix="/articles", tags=["articles"])
 
@@ -108,22 +110,73 @@ async def get_regions(session: AsyncSession = Depends(get_session)):
 
 @router.get("/stats")
 async def get_stats(session: AsyncSession = Depends(get_session)):
-    """Return article statistics including today's count."""
+    """Return comprehensive statistics for monitoring and testing."""
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-
-    # Count articles published today
-    today_count_result = await session.execute(
-        select(func.count(Article.id)).where(Article.published_at >= today_start)
-    )
-    today_count = today_count_result.scalar_one()
 
     # Total count
     total_result = await session.execute(select(func.count(Article.id)))
     total_count = total_result.scalar_one()
 
+    # Count by rating status
+    rated_result = await session.execute(
+        select(func.count(Article.id)).where(Article.is_rated == True)
+    )
+    rated_count = rated_result.scalar_one()
+
+    pending_result = await session.execute(
+        select(func.count(Article.id)).where(Article.rating_failed == True)
+    )
+    pending_count = pending_result.scalar_one()
+
+    # Count pre-filtered (has excluded_reason starting with "keyword_")
+    filtered_result = await session.execute(
+        select(func.count(Article.id)).where(Article.excluded_reason.like("keyword_%"))
+    )
+    prefiltered_count = filtered_result.scalar_one()
+
+    # Count articles above threshold
+    above_threshold_result = await session.execute(
+        select(func.count(Article.id)).where(
+            Article.is_rated == True,
+            Article.hopefulness_score >= settings.RATING_THRESHOLD,
+        )
+    )
+    above_threshold_count = above_threshold_result.scalar_one()
+
+    # Count by source
+    source_query = (
+        select(Article.source_name, func.count(Article.id).label("count"))
+        .group_by(Article.source_name)
+        .order_by(func.count(Article.id).desc())
+    )
+    source_result = await session.execute(source_query)
+    sources = {row.source_name: row.count for row in source_result.all()}
+
+    # Count fetched today
+    today_result = await session.execute(
+        select(func.count(Article.id)).where(Article.fetched_at >= today_start)
+    )
+    today_count = today_result.scalar_one()
+
     return {
-        "today": today_count,
-        "total": total_count,
+        "articles": {
+            "total": total_count,
+            "rated": rated_count,
+            "pending_rating": pending_count,
+            "prefiltered": prefiltered_count,
+            "above_threshold": above_threshold_count,
+            "fetched_today": today_count,
+        },
+        "sources": sources,
+        "api_usage": {
+            "guardian": get_guardian_usage(),
+            "thenewsapi": get_thenewsapi_usage(),
+        },
+        "config": {
+            "rating_threshold": settings.RATING_THRESHOLD,
+            "guardian_enabled": settings.GUARDIAN_ENABLED,
+            "thenewsapi_enabled": settings.THENEWSAPI_ENABLED,
+        },
     }
 
 

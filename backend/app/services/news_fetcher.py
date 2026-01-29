@@ -12,6 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import Article
 from app.services.content_filter import detect_category
 from app.services.article_rater import get_rater
+from app.services.guardian_fetcher import fetch_guardian_articles
+from app.services.thenewsapi_fetcher import fetch_thenewsapi_articles
+from app.services.keyword_filter import pre_filter_article
+from app.services.article_selector import select_balanced_articles
 
 # Rate limit: 5 requests per minute = 12 seconds between calls
 GEMINI_RATE_LIMIT_DELAY = 12
@@ -118,8 +122,8 @@ def fetch_rss_feed(url: str) -> list[dict]:
         return []
 
 
-def fetch_all_sources() -> list[dict]:
-    """Fetch articles from all RSS sources."""
+def fetch_rss_sources() -> list[dict]:
+    """Fetch articles from RSS sources only."""
     all_articles = []
 
     for source in RSS_SOURCES:
@@ -129,6 +133,43 @@ def fetch_all_sources() -> list[dict]:
         all_articles.extend(articles)
 
     return all_articles
+
+
+async def fetch_all_sources() -> list[dict]:
+    """Fetch articles from all sources (RSS feeds + APIs)."""
+    all_articles = []
+    source_counts = {}
+
+    # Fetch from RSS feeds (synchronous)
+    rss_articles = fetch_rss_sources()
+    all_articles.extend(rss_articles)
+    source_counts["RSS Feeds"] = len(rss_articles)
+
+    # Fetch from Guardian API
+    guardian_articles = await fetch_guardian_articles()
+    all_articles.extend(guardian_articles)
+    source_counts["The Guardian"] = len(guardian_articles)
+
+    # Fetch from TheNewsAPI
+    thenewsapi_articles = await fetch_thenewsapi_articles()
+    all_articles.extend(thenewsapi_articles)
+    source_counts["TheNewsAPI"] = len(thenewsapi_articles)
+
+    # Deduplicate by guid
+    seen_guids = set()
+    unique_articles = []
+    for article in all_articles:
+        guid = article.get("guid")
+        if guid and guid not in seen_guids:
+            seen_guids.add(guid)
+            unique_articles.append(article)
+
+    # Log source breakdown
+    for source, count in source_counts.items():
+        logger.info(f"  {source}: {count} articles")
+    logger.info(f"Total: {len(all_articles)} fetched, {len(unique_articles)} unique after deduplication")
+
+    return unique_articles
 
 
 async def store_articles(articles: list[dict], session: AsyncSession) -> int:
@@ -153,15 +194,70 @@ async def store_articles(articles: list[dict], session: AsyncSession) -> int:
 
     logger.info(f"Processing {len(new_articles)} new articles")
 
-    # Rate and store articles one by one (limited to conserve daily quota)
+    # Apply keyword pre-filter to save Gemini API calls
+    passed_filter = []
+    filtered_out = []
+
+    for article_data in new_articles:
+        headline = article_data.get("title", "")
+        summary = article_data.get("summary") or ""
+        filter_result = pre_filter_article(headline, summary)
+
+        if filter_result["passed"]:
+            passed_filter.append(article_data)
+        else:
+            article_data["_filter_reason"] = filter_result["reason"]
+            filtered_out.append(article_data)
+
+    if filtered_out:
+        logger.info(f"Pre-filter: {len(filtered_out)} articles filtered out, {len(passed_filter)} passed")
+
+    # Use balanced selection (round-robin by source) for fair distribution
     rater = get_rater()
     new_count = 0
-    articles_to_rate = new_articles[:MAX_ARTICLES_PER_FETCH]
-    articles_to_store_unrated = new_articles[MAX_ARTICLES_PER_FETCH:]
+    articles_to_rate = select_balanced_articles(passed_filter, MAX_ARTICLES_PER_FETCH)
+
+    # Get the guids of selected articles to determine which are unrated
+    selected_guids = {a.get("guid") for a in articles_to_rate}
+    articles_to_store_unrated = [a for a in passed_filter if a.get("guid") not in selected_guids]
+
+    if articles_to_rate:
+        sources_selected = set(a.get("source_name") for a in articles_to_rate)
+        logger.info(f"Balanced selection: {len(articles_to_rate)} articles from {len(sources_selected)} sources")
 
     if articles_to_store_unrated:
         logger.info(f"Will rate {len(articles_to_rate)} articles now, {len(articles_to_store_unrated)} saved for later")
 
+    # Store filtered-out articles first (no Gemini call needed)
+    for article_data in filtered_out:
+        headline = article_data.get("title", "")
+        summary = article_data.get("summary") or ""
+        category = detect_category(headline, summary)
+
+        image_url = article_data.get("image_url")
+        if not image_url:
+            article_link = article_data.get("link", "")
+            if article_link:
+                image_url = await fetch_og_image(article_link)
+
+        article = Article(
+            guid=article_data.get("guid"),
+            headline=headline,
+            summary=summary,
+            source_url=article_data.get("link", ""),
+            source_name=article_data.get("source_name", ""),
+            image_url=image_url,
+            published_at=article_data.get("published"),
+            hopefulness_score=None,
+            category=category,
+            is_rated=True,  # Mark as rated so it doesn't go to retry queue
+            rating_failed=False,
+            excluded_reason=article_data.get("_filter_reason"),
+        )
+        session.add(article)
+        new_count += 1
+
+    # Rate articles that passed the pre-filter
     for i, article_data in enumerate(articles_to_rate):
         headline = article_data.get("title", "")
         summary = article_data.get("summary") or ""
@@ -252,8 +348,8 @@ async def store_articles(articles: list[dict], session: AsyncSession) -> int:
 
 
 async def fetch_and_store(session: AsyncSession) -> dict:
-    """Fetch all RSS sources and store new articles in the database."""
-    articles = fetch_all_sources()
+    """Fetch from all sources and store new articles in the database."""
+    articles = await fetch_all_sources()
     new_count = await store_articles(articles, session)
 
     return {"fetched": len(articles), "new": new_count}

@@ -14,6 +14,8 @@ from app.database import async_session
 from app.models import Article
 from app.services.news_fetcher import fetch_and_store
 from app.services.article_rater import get_rater
+from app.services.keyword_filter import pre_filter_article
+from app.services.article_selector import select_balanced_articles
 
 logger = logging.getLogger(__name__)
 
@@ -49,30 +51,79 @@ async def retry_failed_ratings() -> None:
     logger.info("Scheduler: Starting retry of failed ratings")
 
     async with async_session() as session:
-        # Get articles that failed rating (limit to 5 to conserve daily quota)
+        # Get unrated articles (fetch more than needed for balanced selection)
         result = await session.execute(
             select(Article)
             .where(Article.rating_failed == True)
-            .limit(5)
+            .order_by(Article.published_at.desc())
+            .limit(50)
         )
-        failed_articles = result.scalars().all()
+        pending_articles = result.scalars().all()
 
-        if not failed_articles:
+        if not pending_articles:
             logger.info("Scheduler: No failed articles to retry")
             return
 
-        logger.info(f"Scheduler: Retrying {len(failed_articles)} failed articles")
+        logger.info(f"Scheduler: Found {len(pending_articles)} pending articles")
+
+        # Apply pre-filter first
+        passed_filter = []
+        filtered_count = 0
+
+        for article in pending_articles:
+            filter_result = pre_filter_article(
+                article.headline,
+                article.summary or ""
+            )
+
+            if not filter_result["passed"]:
+                # Mark as filtered out, skip Gemini
+                article.is_rated = True
+                article.rating_failed = False
+                article.excluded_reason = filter_result["reason"]
+                filtered_count += 1
+            else:
+                passed_filter.append(article)
+
+        if filtered_count > 0:
+            logger.info(f"Scheduler: Pre-filtered {filtered_count} articles")
+
+        if not passed_filter:
+            await session.commit()
+            logger.info("Scheduler: No articles passed pre-filter")
+            return
+
+        # Convert to dicts for balanced selection
+        article_dicts = [
+            {
+                "id": a.id,
+                "source_name": a.source_name,
+                "published": a.published_at,
+            }
+            for a in passed_filter
+        ]
+
+        # Use balanced selection (round-robin by source)
+        selected_dicts = select_balanced_articles(article_dicts, 5)
+        selected_ids = {d["id"] for d in selected_dicts}
+
+        # Get the actual article objects for selected items
+        articles_to_rate = [a for a in passed_filter if a.id in selected_ids]
+
+        if articles_to_rate:
+            sources = set(a.source_name for a in articles_to_rate)
+            logger.info(f"Scheduler: Rating {len(articles_to_rate)} articles from {len(sources)} sources")
 
         rater = get_rater()
         success_count = 0
 
-        for i, article in enumerate(failed_articles):
-            # Rate limit: wait 12 seconds between calls (RPM=5)
+        for i, article in enumerate(articles_to_rate):
+            # Rate limit: wait 12 seconds between Gemini calls (RPM=5)
             if i > 0:
                 logger.debug(f"Rate limiting: waiting {GEMINI_RATE_LIMIT_DELAY}s before next API call")
                 await asyncio.sleep(GEMINI_RATE_LIMIT_DELAY)
 
-            logger.info(f"Retrying article {i + 1}/{len(failed_articles)}: {article.headline[:50]}")
+            logger.info(f"Rating article {i + 1}/{len(articles_to_rate)}: {article.headline[:50]}")
             rating = await rater.rate_article(
                 title=article.headline,
                 summary=article.summary or "No summary",
@@ -86,11 +137,11 @@ async def retry_failed_ratings() -> None:
                 article.is_rated = True
                 article.rating_failed = False
                 success_count += 1
-                logger.debug(f"Retry succeeded: {score}")
+                logger.debug(f"Rating succeeded: {score}")
 
         await session.commit()
         logger.info(
-            f"Scheduler: Retry complete - {success_count}/{len(failed_articles)} succeeded"
+            f"Scheduler: Retry complete - {success_count} rated, {filtered_count} pre-filtered"
         )
 
 
