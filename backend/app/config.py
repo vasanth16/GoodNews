@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     DEBUG: bool = False
-    FETCH_INTERVAL_HOURS: int = 6
+    FETCH_INTERVAL_HOURS: int = 24
     DATABASE_URL: str = "sqlite+aiosqlite:///./news.db"
     CORS_ORIGINS: str = "http://localhost:5173"
     LOG_LEVEL: str = "INFO"

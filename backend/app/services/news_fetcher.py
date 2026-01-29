@@ -17,10 +17,10 @@ from app.services.thenewsapi_fetcher import fetch_thenewsapi_articles
 from app.services.keyword_filter import pre_filter_article
 from app.services.article_selector import select_balanced_articles
 
-# Rate limit: 5 requests per minute = 12 seconds between calls
-GEMINI_RATE_LIMIT_DELAY = 12
-# Max articles to rate per fetch cycle (conserve daily quota of 20)
-MAX_ARTICLES_PER_FETCH = 5
+# Rate limit: be conservative with free tier (15s between calls)
+GEMINI_RATE_LIMIT_DELAY = 15
+# Max articles to rate per fetch cycle (conserve daily quota)
+MAX_ARTICLES_PER_FETCH = 3
 
 logger = logging.getLogger(__name__)
 

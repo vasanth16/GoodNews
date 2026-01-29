@@ -4,8 +4,8 @@ from datetime import datetime, timedelta
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-# Rate limit: 5 requests per minute = 12 seconds between calls
-GEMINI_RATE_LIMIT_DELAY = 12
+# Rate limit: be conservative with free tier (15s between calls)
+GEMINI_RATE_LIMIT_DELAY = 15
 from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy import delete, select
 
@@ -103,8 +103,8 @@ async def retry_failed_ratings() -> None:
             for a in passed_filter
         ]
 
-        # Use balanced selection (round-robin by source)
-        selected_dicts = select_balanced_articles(article_dicts, 5)
+        # Use balanced selection (round-robin by source) - limit to 3 to conserve API quota
+        selected_dicts = select_balanced_articles(article_dicts, 3)
         selected_ids = {d["id"] for d in selected_dicts}
 
         # Get the actual article objects for selected items
@@ -173,10 +173,10 @@ def start_scheduler() -> None:
         replace_existing=True,
     )
 
-    # Add retry job for failed ratings - run every 2 hours
+    # Add retry job for failed ratings - run every 4 hours (conservative for free tier)
     scheduler.add_job(
         retry_failed_ratings,
-        trigger=IntervalTrigger(hours=2),
+        trigger=IntervalTrigger(hours=4),
         id="retry_ratings",
         name="Retry failed article ratings",
         replace_existing=True,
@@ -185,7 +185,7 @@ def start_scheduler() -> None:
     scheduler.start()
     logger.info(
         f"Scheduler started: fetching every {settings.FETCH_INTERVAL_HOURS} hours, "
-        "retry ratings every 2 hours, cleanup daily"
+        "retry ratings every 4 hours, cleanup daily"
     )
 
 
