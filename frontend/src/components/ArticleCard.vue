@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { ArrowTopRightOnSquareIcon, ShareIcon } from '@heroicons/vue/20/solid'
 import Toast from './Toast.vue'
+import HopeLevel from './HopeLevel.vue'
 
 const props = defineProps({
   article: {
@@ -104,14 +105,15 @@ async function copyToClipboard() {
 
     <!-- Content -->
     <div class="p-3 flex flex-col flex-1 min-w-0">
-      <!-- Top row: category + time -->
-      <div class="flex items-center gap-2 mb-1.5">
+      <!-- Top row: category + hope level + time -->
+      <div class="flex items-center gap-1.5 mb-1.5 flex-wrap">
         <span
           v-if="article.category"
           :class="[categoryColor, 'px-1.5 py-0.5 text-[10px] font-medium rounded']"
         >
           {{ article.category }}
         </span>
+        <HopeLevel :score="article.hopefulness_score" />
         <span class="text-[10px] text-gray-400">{{ relativeTime }}</span>
       </div>
 
