@@ -105,15 +105,15 @@ async function copyToClipboard() {
 
     <!-- Content -->
     <div class="p-3 flex flex-col flex-1 min-w-0">
-      <!-- Top row: category + hope level + time -->
+      <!-- Top row: hope level + category + time -->
       <div class="flex items-center gap-1.5 mb-1.5 flex-wrap">
+        <HopeLevel :score="article.hopefulness_score" />
         <span
           v-if="article.category"
           :class="[categoryColor, 'px-1.5 py-0.5 text-[10px] font-medium rounded']"
         >
           {{ article.category }}
         </span>
-        <HopeLevel :score="article.hopefulness_score" />
         <span class="text-[10px] text-gray-400">{{ relativeTime }}</span>
       </div>
 

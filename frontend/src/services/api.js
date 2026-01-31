@@ -51,7 +51,7 @@ export async function getArticles({ limit = 20, offset = 0, category, region, mi
 
   if (category) params.set('category', category)
   if (region) params.set('region', region)
-  if (minScore !== undefined) params.set('min_score', minScore)
+  if (minScore != null) params.set('min_score', minScore)
 
   return request(`/api/articles?${params}`)
 }

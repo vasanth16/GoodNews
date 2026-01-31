@@ -45,10 +45,10 @@ async def get_articles(
     count_result = await session.execute(count_query)
     total = count_result.scalar_one()
 
-    # Get articles sorted by score (desc), then published date (desc)
+    # Get articles sorted by published date (newest first)
     query = (
         base_query
-        .order_by(Article.hopefulness_score.desc(), Article.published_at.desc())
+        .order_by(Article.published_at.desc())
         .offset(offset)
         .limit(limit)
     )

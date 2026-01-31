@@ -10,7 +10,7 @@ const total = ref(0)
 const filters = reactive({
   category: null,
   region: null,
-  minScore: 0,
+  minScore: null,
 })
 
 const PAGE_SIZE = 12
@@ -68,7 +68,7 @@ export function useArticles() {
   function clearFilters() {
     filters.category = null
     filters.region = null
-    filters.minScore = 0
+    filters.minScore = null
     fetchArticles(true)
   }
 

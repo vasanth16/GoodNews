@@ -46,6 +46,7 @@ onMounted(() => {
         :regions="regions"
         :active-category="filters.category"
         :active-region="filters.region"
+        :active-min-score="filters.minScore"
         @filter-change="handleFilterChange"
       />
 
