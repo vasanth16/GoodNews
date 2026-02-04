@@ -51,9 +51,17 @@ onMounted(() => {
       />
 
       <ArticleFeed />
+
+      <p class="text-xs text-gray-500 dark:text-gray-400 text-center mt-8 px-4">
+        Articles are curated with the help of AI. Goodness scores may not be fully accurate.
+      </p>
     </main>
 
     <InstallPrompt />
+
+    <footer class="fixed bottom-0 left-0 right-0 py-2 text-center text-xs text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-950">
+      Made with &#10084; from Seattle, WA
+    </footer>
   </div>
 </template>
 
